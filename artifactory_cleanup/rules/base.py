@@ -126,6 +126,15 @@ class Rule(object):
         """
         return filters
 
+    def aql_add_include(self, includes: set) -> set:
+        """
+        Declare which extra AQL fields this rule needs in `.include()`.
+
+        The field `*` (all basic fields: repo, path, name, size, created, etc.) is always included.
+        Override this method and add `property` or `stat` only when your filter actually reads those fields.
+        """
+        return includes
+
     def aql_add_text(self, aql: str) -> str:
         """
         You can change AQL text after applying all rules filters.
@@ -253,8 +262,16 @@ class CleanupPolicy(object):
         """
         Collect from all rules additional texts of requests
         """
+        includes = {"*",}
+        for rule in self.rules:
+            includes = rule.aql_add_include(includes)
+
+        include_fields = sorted(includes)
+        include_str = ", ".join(f'"{f}"' for f in include_fields)
+        print(f"AQL include fields: {include_str}")
+
         filters_text = json.dumps(find_filters)
-        aql = f'{self.DOMAIN}.find({filters_text}).include("*", "property", "stat")'
+        aql = f'{self.DOMAIN}.find({filters_text}).include({include_str})'
 
         for rule in self.rules:
             before_aql = aql
